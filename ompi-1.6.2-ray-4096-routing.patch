@@ -1,0 +1,26 @@
+diff --git a/ompi/mpi/c/isend.c b/ompi/mpi/c/isend.c
+index 56f4b4d..e2e92fe 100644
+--- a/ompi/mpi/c/isend.c
++++ b/ompi/mpi/c/isend.c
+@@ -57,8 +57,6 @@ int MPI_Isend(void *buf, int count, MPI_Datatype type, int dest,
+             rc = MPI_ERR_COUNT;
+         } else if (MPI_DATATYPE_NULL == type || NULL == type) {
+             rc = MPI_ERR_TYPE;
+-        } else if (tag < 0 || tag > mca_pml.pml_max_tag) {
+-            rc = MPI_ERR_TAG;
+         } else if (ompi_comm_peer_invalid(comm, dest) &&
+                    (MPI_PROC_NULL != dest)) {
+             rc = MPI_ERR_RANK;
+diff --git a/ompi/mpi/c/recv.c b/ompi/mpi/c/recv.c
+index 6215bb4..74add7f 100644
+--- a/ompi/mpi/c/recv.c
++++ b/ompi/mpi/c/recv.c
+@@ -55,8 +55,6 @@ int MPI_Recv(void *buf, int count, MPI_Datatype type, int source,
+         
+         if (ompi_comm_invalid(comm)) {
+             return OMPI_ERRHANDLER_INVOKE(MPI_COMM_WORLD, MPI_ERR_COMM, FUNC_NAME);
+-        } else if (((tag < 0) && (tag != MPI_ANY_TAG)) || (tag > mca_pml.pml_max_tag)) {
+-            rc = MPI_ERR_TAG;
+         } else if ((source != MPI_ANY_SOURCE) && 
+                    (MPI_PROC_NULL != source) &&
+                    ompi_comm_peer_invalid(comm, source)) {
