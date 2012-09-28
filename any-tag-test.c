@@ -15,6 +15,7 @@
 
 #include <mpi.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #define SENDER 0
 #define RECEIVER 1
@@ -33,6 +34,7 @@ void sender(){
 	MPI_Isend(NULL,0,MPI_BYTE,RECEIVER,NEGATIVE_TAG,MPI_COMM_WORLD,&request1);
 	MPI_Request request2;
 	MPI_Isend(NULL,0,MPI_BYTE,RECEIVER,POSITIVE_TAG,MPI_COMM_WORLD,&request2);
+
 }
 
 void receiver(){
@@ -52,6 +54,8 @@ SlaveModeHandler getHandler(SlaveModeHandler*table,int rank){
 
 int main(int argc,char**argv){
 	MPI_Init(&argc,&argv);
+
+	printf("%d\n",MPI_ANY_TAG);
 
 	int rank=-1;
 	int size=-1;
