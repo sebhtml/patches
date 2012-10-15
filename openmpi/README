@@ -1,0 +1,9 @@
+ompi-1.6.2-ray-4096-routing.patch
+
+This patch allows any value for MPI tags in Open-MPI.
+The patch deletes a few lines in MPI_Recv and MPI_Isend only.
+
+This patch is required to run the Ray software tool on 4096 processes
+with the virtual message router.
+
+see http://www.open-mpi.org/community/lists/users/2012/09/20344.php

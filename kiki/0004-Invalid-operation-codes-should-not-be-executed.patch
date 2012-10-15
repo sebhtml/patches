@@ -1,0 +1,87 @@
+From 2ada83f4d5f81148569ff72e8a5630c708d173c7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Boisvert?= <sebastien.boisvert.3@ulaval.ca>
+Date: Thu, 30 Aug 2012 09:07:39 -0400
+Subject: [PATCH 4/6] Invalid operation codes should not be executed
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When an invalid operation code is found, it should not be
+executed.
+
+Signed-off-by: Sébastien Boisvert <sebastien.boisvert.3@ulaval.ca>
+---
+ extern.h |    1 -
+ ki.c     |    8 +++++++-
+ ki.h     |    6 ++++--
+ 3 files changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/extern.h b/extern.h
+index 9300707..fd0951f 100644
+--- a/extern.h
++++ b/extern.h
+@@ -42,7 +42,6 @@
+ #define KI_V_DOUBLE      (KI_DOUBLE    | KI_VECTOR)
+ #define KI_V_LONG_LONG   (KI_LONG_LONG | KI_VECTOR)
+ 
+-#define KI_NUM_FUNCS     100
+ /* #define KI_BUF_SIZE      0x08000000 /\* 128MB *\/ */
+ #define KI_BUF_SIZE      0x04000000 /* 64MB */
+ /* #define KI_BUF_SIZE      0x02000000 /\* 32MB *\/ */
+diff --git a/ki.c b/ki.c
+index 3785ed0..788aa5a 100644
+--- a/ki.c
++++ b/ki.c
+@@ -1321,12 +1321,18 @@ bool kiIsMyTurn() {
+   return (ki_domain_rank == ki_round_robin || !kiIsParallel());
+ }
+ 
++ki_func_t kiGetCommandFunction(int cmd) {
++  if(cmd >= 0 && cmd < KI_NUM_FUNCS)
++    return ki_functions[cmd];
++  return NULL;
++}
++
+ int kiRunCommand(int cmd) {
+   /* check if cmd is valid */
+   if (cmd == KI_CMD_STOP) return -1;
+ 
+   int outputSize = 0;
+-  ki_func_t func = ki_functions[cmd];
++  ki_func_t func = kiGetCommandFunction(cmd);
+   if (func == NULL) {
+     if (kiIsDomainRoot()) 
+       fprintf(stderr, "Error: command %d not registered.\n", cmd);
+diff --git a/ki.h b/ki.h
+index ab1dab7..2afeda4 100644
+--- a/ki.h
++++ b/ki.h
+@@ -9,7 +9,7 @@
+ 
+ #define KI_UNDEF                    -1
+ 
+-#define KI_CMD_STOP                 -1
++#define KI_CMD_STOP                 0
+ #define KI_CMD_MEM_INFO             1
+ #define KI_CMD_LOAD_SEQ             2
+ #define KI_CMD_LOAD_FASTA           3
+@@ -29,7 +29,8 @@
+ #define KI_CMD_RAIPHY_ORIGINAL      17
+ #define KI_CMD_STORE_STATE          18
+ #define KI_CMD_RESTORE_STATE        19
+-#define KI_CMD_TEST_ARGS            99
++#define KI_CMD_TEST_ARGS            20
++#define KI_NUM_FUNCS                21
+ 
+ 
+ #define KI_OGV_NEW                  0
+@@ -280,5 +281,6 @@ void kiExtendSeq(/*IN/OUT*/char* seq, /*IN*/int sz, int beg, int root, /*OUT*/in
+ void kiExactAssemble(char* outputName);
+ 
+ MPI_Datatype convertToMPIDatatype(int kiDatatype);
++ki_func_t kiGetCommandFunction(int cmd);
+ 
+ #endif /* _KI_H_ */
+-- 
+1.7.8.6
+

@@ -1,0 +1,291 @@
+From b8db294b35b92d860c1338d0189984736e52994d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Boisvert?= <sebastien.boisvert.3@ulaval.ca>
+Date: Thu, 30 Aug 2012 00:50:59 -0400
+Subject: [PATCH 1/6] MPI_Status has no attribute called count
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This patch stores the number of bytes read or written in a
+variable of type size_t instead of storing this information in
+MPI_Status.count.
+
+Signed-off-by: Sébastien Boisvert <sebastien.boisvert.3@ulaval.ca>
+---
+ io.c |   23 ++++++++++++-----------
+ io.h |    8 ++++----
+ ki.c |   49 +++++++++++++++++++++++++++----------------------
+ 3 files changed, 43 insertions(+), 37 deletions(-)
+
+diff --git a/io.c b/io.c
+index c92e428..138410d 100644
+--- a/io.c
++++ b/io.c
+@@ -57,8 +57,8 @@ int KI_File_seek(KI_File fh, MPI_Offset offset, int whence) {
+   }
+ }
+ 
+-int KI_File_read(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status) {
+-  status->count = 0;
++int KI_File_read(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements) {
++  *elements = 0;
+   int ret = 0;
+   if (kiIsParallel() && ki_domain_size > 1)  {
+     ret = MPI_File_read(fh.fh, buf, count, datatype, status);
+@@ -72,43 +72,43 @@ int KI_File_read(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_St
+   } else {
+     int sz;
+     MPI_Type_size(datatype, &sz);
+-    status->count = fread(buf, sz, count, fh.fp);
++    *elements = fread(buf, sz, count, fh.fp);
+     return ferror(fh.fp) ? !MPI_SUCCESS : MPI_SUCCESS;
+   }
+   return ret;
+ }
+ 
+-int KI_File_write(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status) {
+-  status->count = 0;
++int KI_File_write(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements) {
++  *elements = 0;
+   if (kiIsParallel() && ki_domain_size > 1) 
+     return MPI_File_write(fh.fh, buf, count, datatype, status);
+   else {
+     int sz;
+     MPI_Type_size(datatype, &sz);
+-    status->count = fwrite(buf, sz, count, fh.fp);
++    *elements = fwrite(buf, sz, count, fh.fp);
+     return ferror(fh.fp) ? !MPI_SUCCESS : MPI_SUCCESS;
+   }
+ }
+ 
+-int KI_File_read_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status) {
++int KI_File_read_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements) {
+   if (kiIsParallel() && ki_domain_size > 1) 
+     return MPI_File_read_shared(fh.fh, buf, count, datatype, status);
+   else {
+     int sz;
+     MPI_Type_size(datatype, &sz);
+-    status->count = fread(buf, sz, count, fh.fp);
++    *elements = fread(buf, sz, count, fh.fp);
+     fflush(fh.fp);
+     return ferror(fh.fp) ? !MPI_SUCCESS : MPI_SUCCESS;
+   }
+ }
+ 
+-int KI_File_write_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status) {
++int KI_File_write_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements) {
+   if (kiIsParallel() && ki_domain_size > 1) 
+     return MPI_File_write_shared(fh.fh, buf, count, datatype, status);
+   else {
+     int sz;
+     MPI_Type_size(datatype, &sz);
+-    status->count = fwrite(buf, sz, count, fh.fp);
++    *elements = fwrite(buf, sz, count, fh.fp);
+     fflush(fh.fp);
+     return ferror(fh.fp) ? !MPI_SUCCESS : MPI_SUCCESS;
+   }
+@@ -180,7 +180,8 @@ void kifprintf(KI_File fh, char* format, ...) {
+ 
+   int len = strlen(buf);
+   MPI_Status status;
+-  KI_File_write_shared(fh, buf, len, MPI_CHAR, &status);
++  size_t elements=0;
++  KI_File_write_shared(fh, buf, len, MPI_CHAR, &status,&elements);
+ }
+ 
+ 
+diff --git a/io.h b/io.h
+index 6f96f75..a2a40f1 100644
+--- a/io.h
++++ b/io.h
+@@ -11,10 +11,10 @@ int KI_File_open(char *filename, int amode, MPI_Info info, KI_File *fh);
+ int KI_File_close(KI_File *fh);
+ int KI_File_get_size(KI_File fh, MPI_Offset *size);
+ int KI_File_seek(KI_File fh, MPI_Offset offset, int whence);
+-int KI_File_read(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status);
+-int KI_File_write(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status);
+-int KI_File_read_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status);
+-int KI_File_write_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status);
++int KI_File_read(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements);
++int KI_File_write(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements);
++int KI_File_read_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements);
++int KI_File_write_shared(KI_File fh, void *buf, int count, MPI_Datatype datatype, MPI_Status *status,size_t*elements);
+ 
+ int KI_File_copy(char* filename1, char* filename2, bool replace);
+ int KI_File_backup(char* filename);
+diff --git a/ki.c b/ki.c
+index ee7dbd1..79cfd74 100644
+--- a/ki.c
++++ b/ki.c
+@@ -846,6 +846,7 @@ int  kiFarmerRAIphyOriginal() {
+   char buf[bufSize];
+   char* bufTop = buf;
+   MPI_Status status;
++  size_t elements=0;
+   
+   rai_db_t* db = NULL;
+   db = loadDatabase(dbName);
+@@ -859,12 +860,12 @@ int  kiFarmerRAIphyOriginal() {
+     sprintf(bufTop, ">%s\n%s\n", ki_seqs->names[i], db->names[class]);
+     bufTop += strlen(bufTop);
+     if (bufTop-buf > bufSize/2) {
+-      KI_File_write_shared(fh, buf, bufTop-buf, MPI_CHAR, &status);
++      KI_File_write_shared(fh, buf, bufTop-buf, MPI_CHAR, &status,&elements);
+       bufTop = buf;
+     }
+   }
+ 
+-  KI_File_write_shared(fh, buf, bufTop-buf, MPI_CHAR, &status);
++  KI_File_write_shared(fh, buf, bufTop-buf, MPI_CHAR, &status,&elements);
+   KI_File_close(&fh);
+ 
+   kiFreeRaiDb(db);
+@@ -2288,6 +2289,7 @@ long long kiReadFastqParallel(char* fileName) {
+   MPI_Offset fileSize;
+   MPI_Offset beg;
+   MPI_Status status;
++  size_t elements=0;
+   
+   int rc;
+   char* buf;  
+@@ -2335,16 +2337,16 @@ long long kiReadFastqParallel(char* fileName) {
+       count = MIN(bytesToRead, (bufSize - moveSize));
+       assert(count > 0);
+       int countCopy = count;
+-      int ret = KI_File_read(fh, pos, count, MPI_BYTE, &status);
++      int ret = KI_File_read(fh, pos, count, MPI_BYTE, &status,&elements);
+       if (ret != MPI_SUCCESS) {
+         fprintf(stderr, "MPI_read error\n");
+       }
+-      if (count != status.count) {
++      if (count != elements) {
+         kipm("bytesToRead(l) = %ld, bytesToRead(d) = %d\n", bytesToRead, bytesToRead);
+         kipm("bufSize = %d, moveSize = %d\n", bufSize, moveSize);
+-        kipm("countCopy = %d, count = %d, status.count = %d\n", countCopy, count, status.count);
++        kipm("countCopy = %d, count = %d, status.count = %d\n", countCopy, count, elements);
+       }
+-      assert(count == status.count);
++      assert(count == elements);
+       bytesToRead -= count;
+ 
+       if (lastChunk && bytesToRead == 0)
+@@ -2469,6 +2471,7 @@ long long kiReadFastaParallel(char* fileName) {
+   MPI_Offset fileSize;
+   MPI_Offset beg;
+   MPI_Status status;
++  size_t elements=0;
+   
+   int rc;
+   char* buf;  
+@@ -2514,8 +2517,8 @@ long long kiReadFastaParallel(char* fileName) {
+     pos = buf;
+     while (bytesToRead > 0) {
+       count = MIN(bytesToRead, bufSize - moveSize);
+-      KI_File_read(fh, pos, count, MPI_BYTE, &status);
+-      assert(count == status.count);
++      KI_File_read(fh, pos, count, MPI_BYTE, &status,&elements);
++      assert(count == elements);
+       bytesToRead -= count;
+ 
+       if (lastChunk && bytesToRead == 0)
+@@ -3507,6 +3510,7 @@ long long kiStoreState(char* filePrefix) {
+   KI_File fh;
+   MPI_Status status;
+   KI_File_open(filename, MPI_MODE_WRONLY | MPI_MODE_CREATE, MPI_INFO_NULL, &fh);
++  size_t elements=0;
+ 
+   if (kiIsDomainRoot()) {
+     int j, displsSum = (int)kiAlignedSize(sizeof(int)*(ki_domain_size+1), 4);    
+@@ -3515,8 +3519,8 @@ long long kiStoreState(char* filePrefix) {
+       displsSum += cnts[j];
+       kipmsg(3, "Storing: cnts[%d] = %d, displs[%d] = %d\n", j, cnts[j], j, displs[j]);
+     }
+-    KI_File_write(fh, &ki_domain_size, 1,     MPI_INT, &status);
+-    KI_File_write(fh, displs, ki_domain_size, MPI_INT, &status);
++    KI_File_write(fh, &ki_domain_size, 1,     MPI_INT, &status,&elements);
++    KI_File_write(fh, displs, ki_domain_size, MPI_INT, &status,&elements);
+   }
+ 
+   int displ;
+@@ -3533,7 +3537,7 @@ long long kiStoreState(char* filePrefix) {
+ 
+   kipmsg(3, "displ = %d\n", displ);
+   KI_File_seek(fh, displ, MPI_SEEK_SET);
+-  KI_File_write(fh, &nSeq, 1, MPI_INT, &status);
++  KI_File_write(fh, &nSeq, 1, MPI_INT, &status,&elements);
+ 
+   int i;
+   int bit;
+@@ -3545,14 +3549,14 @@ long long kiStoreState(char* filePrefix) {
+     *p |= (bit << (7 - i % 8));
+     if ((i+1) % 8 == 0) ++p;
+     if ((i+1) % (KI_BUF_SIZE*8) == 0) {
+-      KI_File_write(fh, ki_tmp_buf, KI_BUF_SIZE, MPI_BYTE, &status);
++      KI_File_write(fh, ki_tmp_buf, KI_BUF_SIZE, MPI_BYTE, &status,&elements);
+       memset(ki_tmp_buf, 0, KI_BUF_SIZE);
+       nLeft -= KI_BUF_SIZE;
+       p = ki_tmp_buf;
+       kipm("nLeft = %d KI_BUF_SIZE = %d\n", nLeft, KI_BUF_SIZE);
+     }
+   }
+-  KI_File_write(fh, ki_tmp_buf, nLeft, MPI_BYTE, &status);
++  KI_File_write(fh, ki_tmp_buf, nLeft, MPI_BYTE, &status,&elements);
+ 
+   KI_File_close(&fh);
+ 
+@@ -3570,7 +3574,8 @@ long long kiRestoreState(char* filePrefix) {
+   KI_File fh;
+   MPI_Status status;
+   int rc;
+-  
++  size_t elements=0;
++
+   rc = KI_File_open(filename, MPI_MODE_RDONLY, MPI_INFO_NULL, &fh);
+   if (rc != MPI_SUCCESS) {
+     if (kiIsDomainRoot()) fprintf(stderr, "Error: unable to open file '%s'\n", filename);
+@@ -3581,16 +3586,16 @@ long long kiRestoreState(char* filePrefix) {
+   if (kiIsDomainRoot()) {
+     int nParts;
+     displs = (int*)kiArenaMalloc(KI_ARENA_FARMER, sizeof(int) * ki_domain_size);
+-    KI_File_read(fh, &nParts, 1, MPI_INT, &status);
+-    assert(status.count = 1);
++    KI_File_read(fh, &nParts, 1, MPI_INT, &status,&elements);
++    assert(elements = 1);
+     
+     if (nParts != ki_domain_size) {
+       fprintf(stderr, "Number of parts in .store file does not match domain size (old = %d vs now = %d).\nRestore failed.\n", nParts, ki_domain_size);
+       KI_File_close(&fh);
+       kiAbort(-1);
+     }
+-    KI_File_read(fh, displs, ki_domain_size, MPI_INT, &status);
+-    assert(status.count = ki_domain_size);
++    KI_File_read(fh, displs, ki_domain_size, MPI_INT, &status,&elements);
++    assert(elements = ki_domain_size);
+   }
+ 
+   int displ;
+@@ -3607,8 +3612,8 @@ long long kiRestoreState(char* filePrefix) {
+ 
+   int nSeq;
+   KI_File_seek(fh, displ, MPI_SEEK_SET);
+-  KI_File_read(fh, &nSeq, 1, MPI_INT, &status);
+-  assert(status.count = 1);
++  KI_File_read(fh, &nSeq, 1, MPI_INT, &status,&elements);
++  assert(elements = 1);
+   
+   if (nSeq != ki_seqs->nSeq) {
+     fprintf(stderr, "Mismatch in number of sequences (old = %d vs now = %d).\nRestore failed.\n", nSeq, ki_seqs->nSeq);
+@@ -3624,8 +3629,8 @@ long long kiRestoreState(char* filePrefix) {
+   while (nLeft > 0) {
+     nToRead = kiCeilingDevidedBy(nLeft, 8); /* in bytes */
+     if (nToRead > KI_BUF_SIZE) nToRead = KI_BUF_SIZE;
+-    KI_File_read(fh, ki_tmp_buf, nToRead, MPI_BYTE, &status);
+-    assert(status.count = nToRead);
++    KI_File_read(fh, ki_tmp_buf, nToRead, MPI_BYTE, &status,&elements);
++    assert(elements = nToRead);
+     nLeft -= nToRead * 8;
+     for (p = ki_tmp_buf; i < nSeq; ++i) {
+       bit = (*p >> (7 - i % 8)) & 1;
+-- 
+1.7.8.6
+

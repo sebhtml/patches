@@ -1,0 +1,107 @@
+From eb3e8e9663d462be646f7ad49eb094ce92cbc95d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Boisvert?= <sebastien.boisvert.3@ulaval.ca>
+Date: Thu, 30 Aug 2012 09:22:03 -0400
+Subject: [PATCH 6/6] Display a warning when receiving invalid commands
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+A warning is shown when the received command is invalid.
+
+The code works with 1 processor core, but produces nothing
+with more processor cores, see below. I could try to debug
+the code, but I think something is wrong with the code
+that plays with MPI_Pack and MPI_Unpack. Clearly, it is
+either the sender that sends invalid operation codes, or
+it is the receiver that decodes the information badly.
+
+mpiexec -n 1 ./ki -i short.fa -o test
+
+Read 9 sequences from 'short.fa'.
+All nodes: read 9 sequences from fasta (0.00 s).
+Read length range = [80, 80]
+Hashtable load factor = 1 : 1864135.11
+Memory for sequences in hash = 3728273.0 bytes / seq, 46603.4 bytes / base
+Loaded seqs to hashtable in 0.40 s.
+>> Reads assembled = 9 / 9  (2786.5/s) Time: 0.00 s
+World memory used = 213495 KB
+World memory peak = 244988 KB (max 244988 KB/proc)
+World memory leak = 0 bytes
+Time elapsed = 0.56 s
+
+mpiexec -n 3 ./ki -i short.fa -o test
+
+Warning: received invalid command 6409 from 0
+Error: command 6409 not registered on MPI rank 0.
+Warning: received invalid command 267 from 0
+Error: command 267 not registered on MPI rank 0.
+Warning: received invalid command 2309 from 0
+Error: command 2309 not registered on MPI rank 0.
+Read 0 sequences from 'short.fa'.
+Warning: received invalid command 2311 from 0
+Error: command 2311 not registered on MPI rank 0.
+[0/3][User 0/1] Read length range = [0, 0]
+Warning: received invalid command 2310 from 0
+Error: command 2310 not registered on MPI rank 0.
+Warning: received invalid command 2317 from 0
+Error: command 2317 not registered on MPI rank 0.
+World memory used = 1501 KB
+World memory peak = 37236 KB (max 31948 KB/proc)
+World memory leak = 0 bytes
+[0/3][User 0/1] Time elapsed = 0.02 s
+
+Signed-off-by: Sébastien Boisvert <sebastien.boisvert.3@ulaval.ca>
+---
+ ki.c |   10 ++++++++--
+ ki.h |    1 +
+ 2 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/ki.c b/ki.c
+index e92d917..006167a 100644
+--- a/ki.c
++++ b/ki.c
+@@ -1259,6 +1259,10 @@ void kiDealerStart() {
+   }
+ }
+ 
++bool kiIsValidCommand(int cmd) {
++  return 0 <= cmd && cmd < KI_NUM_FUNCS;
++}
++
+ void kiFarmerStart() {
+   MPI_Status status;
+   
+@@ -1279,6 +1283,9 @@ void kiFarmerStart() {
+ 
+     MPI_Unpack(ki_in_buf, KI_BUF_SIZE, &pos, &cmd, 1, MPI_INT, ki_cmm_world);
+   
++    if(!kiIsValidCommand(cmd))
++      printf("Warning: received invalid command %d from %d\n", cmd, src);
++
+     pos = kiRunCommand(cmd);
+     if (pos < 0) break;         /* KI_CMD_STOP */
+     
+@@ -1340,8 +1347,7 @@ int kiRunCommand(int cmd) {
+   int outputSize = 0;
+   ki_func_t func = kiGetCommandFunction(cmd);
+   if (func == NULL) {
+-    if (kiIsDomainRoot()) 
+-      fprintf(stderr, "Error: command %d not registered.\n", cmd);
++    fprintf(stderr, "Error: command %d not registered on MPI rank %d.\n", cmd, ki_domain_rank);
+   } else {
+     outputSize = (*func)();
+   }
+diff --git a/ki.h b/ki.h
+index 2afeda4..ef577cd 100644
+--- a/ki.h
++++ b/ki.h
+@@ -282,5 +282,6 @@ void kiExactAssemble(char* outputName);
+ 
+ MPI_Datatype convertToMPIDatatype(int kiDatatype);
+ ki_func_t kiGetCommandFunction(int cmd);
++bool kiIsValidCommand(int cmd);
+ 
+ #endif /* _KI_H_ */
+-- 
+1.7.8.6
+

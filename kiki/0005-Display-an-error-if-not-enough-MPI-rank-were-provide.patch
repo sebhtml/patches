@@ -1,0 +1,36 @@
+From 87505202a7e183e90cd4b4b1966c4ed04623d3d7 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Boisvert?= <sebastien.boisvert.3@ulaval.ca>
+Date: Thu, 30 Aug 2012 09:13:22 -0400
+Subject: [PATCH 5/6] Display an error if not enough MPI rank were provided
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Instead of throwing an error when the number of MPI ranks
+is not enough, the program simply stops.
+
+Signed-off-by: Sébastien Boisvert <sebastien.boisvert.3@ulaval.ca>
+---
+ ki.c |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
+
+diff --git a/ki.c b/ki.c
+index 788aa5a..e92d917 100644
+--- a/ki.c
++++ b/ki.c
+@@ -1077,6 +1077,12 @@ void kiDomainInit() {
+   int* ranks[3];
+   int i, j;
+   
++  if(ki_world_size < 3) {
++    fprintf(stderr, "Error: kiki needs at least 3 MPI ranks\n");
++    MPI_Finalize();
++    exit(1);
++  }
++
+   assert(ki_world_size >= 3);
+   /* if (ki_world_size >= 8) { */
+   /*   ratio[0] = 0.1; */
+-- 
+1.7.8.6
+

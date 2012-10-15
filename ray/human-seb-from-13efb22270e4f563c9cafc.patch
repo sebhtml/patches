@@ -1,0 +1,313 @@
+diff --git a/code/plugin_Scaffolder/Scaffolder.cpp b/code/plugin_Scaffolder/Scaffolder.cpp
+index 1b8305c..6f3132e 100644
+--- a/code/plugin_Scaffolder/Scaffolder.cpp
++++ b/code/plugin_Scaffolder/Scaffolder.cpp
+@@ -41,13 +41,11 @@
+ #include <math.h> /* for sqrt */
+ 
+ __CreatePlugin(Scaffolder);
++__CreateMasterModeAdapter(Scaffolder,RAY_MASTER_MODE_WRITE_SCAFFOLDS);
++__CreateSlaveModeAdapter(Scaffolder,RAY_SLAVE_MODE_SCAFFOLDER);
+ 
+- /**/
+-__CreateMasterModeAdapter(Scaffolder,RAY_MASTER_MODE_WRITE_SCAFFOLDS); /**/
+- /**/
+-__CreateSlaveModeAdapter(Scaffolder,RAY_SLAVE_MODE_SCAFFOLDER); /**/
+- /**/
+- /**/
++#define __SCAFFOLDER_IGNORE_THRESHOLD 1024
++#define __BUG_5361
+ 
+ using namespace std;
+ 
+@@ -503,9 +501,9 @@ void Scaffolder::performSummary(){
+ 
+ 	LargeCount sum=0;
+ 
+-	int peakCoverage=getMode(&m_vertexCoverageValues);
++	CoverageDepth peakCoverage=getMode(&m_vertexCoverageValues);
+ 
+-	int repeatCoverage=peakCoverage*REPEAT_MULTIPLIER;
++	CoverageDepth repeatCoverage=peakCoverage*REPEAT_MULTIPLIER;
+ 
+ 	#ifdef CONFIG_USE_COVERAGE_DISTRIBUTION
+ 	repeatCoverage=m_parameters->getRepeatCoverage();
+@@ -697,6 +695,14 @@ void Scaffolder::processVertex(Kmer*vertex){
+ 	// 					get the paths that goes on them
+ 	// 					print the linking information
+ 	if(!m_coverageRequested){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] sending RAY_MPI_TAG_GET_VERTEX_EDGES_COMPACT source: 111";
++			cout<<" destination: "<<m_parameters->_vertexRank(vertex)<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		MessageUnit*buffer=(MessageUnit*)m_outboxAllocator->allocate(1*sizeof(Kmer));
+ 		int bufferPosition=0;
+ 		vertex->pack(buffer,&bufferPosition);
+@@ -705,6 +711,7 @@ void Scaffolder::processVertex(Kmer*vertex){
+ 		m_virtualCommunicator->pushMessage(m_workerId,&aMessage);
+ 		m_coverageRequested=true;
+ 		m_coverageReceived=false;
++
+ 		if(m_positionOnContig==0){
+ 			m_scaffoldingSummary.clear();
+ 			m_summaryPerformed=false;
+@@ -733,6 +740,13 @@ void Scaffolder::processVertex(Kmer*vertex){
+ 		}
+ 	}else if(!m_coverageReceived
+ 		&&m_virtualCommunicator->isMessageProcessed(m_workerId)){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] received response for RAY_MPI_TAG_GET_VERTEX_EDGES_COMPACT"<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		vector<MessageUnit> elements;
+ 		m_virtualCommunicator->getMessageResponseElements(m_workerId,&elements);
+ 
+@@ -770,9 +784,26 @@ void Scaffolder::processVertex(Kmer*vertex){
+ 		}
+ 
+ 	}else if(m_coverageReceived){
+-		/* anyway these entries will be checked after anyway... */
+-		if(1 /*m_receivedCoverage<m_parameters->getRepeatCoverage()*/){
++
++/* 
++ * These entries will be checked after anyway.
++ * But still, we don't want to go through those
++ * repeats right now...
++ *
++ * TODO: the peak coverage of the contig should be used instead.
++ * The peak coverage of the distribution may not exist...
++ * Regardless, we need to do some filtering here to remove
++ * some.
++ */
++		if(m_receivedCoverage < __SCAFFOLDER_IGNORE_THRESHOLD*m_parameters->getPeakCoverage()){
+ 			if(!m_initialisedFetcher){
++
++				#ifdef __BUG_5361
++				if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++					cout<<"[DEBUG] starting fetcher with RAY_MPI_TAG_REQUEST_VERTEX_READS"<<endl;
++				}
++				#endif /* __BUG_5361 */
++
+ 				m_readFetcher.constructor(vertex,m_outboxAllocator,m_inbox,
+ 				m_outbox,m_parameters,m_virtualCommunicator,m_workerId,
+ 					RAY_MPI_TAG_REQUEST_VERTEX_READS);
+@@ -828,6 +859,17 @@ void Scaffolder::processAnnotation(){
+ 	int positionOnStrand=a->getPositionOnStrand();
+ 
+ 	if(!m_hasPairRequested){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] sending RAY_MPI_TAG_HAS_PAIRED_READ source: 111";
++			cout<<" destination: "<<rank<<endl;
++			cout<<"[DEBUG] m_readAnnotationId= "<<m_readAnnotationId<<" ";
++			cout<<" Count= "<<m_readFetcher.getResult()->size();
++			cout<<" m_positionOnContig= "<<m_positionOnContig<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		MessageUnit*buffer=(MessageUnit*)m_outboxAllocator->allocate(1*sizeof(Kmer));
+ 		buffer[0]=sequenceId;
+ 		Message aMessage(buffer,1,rank,RAY_MPI_TAG_HAS_PAIRED_READ,m_parameters->getRank());
+@@ -843,9 +885,23 @@ void Scaffolder::processAnnotation(){
+ 		m_hasPair=response[0];
+ 		m_hasPairReceived=true;
+ 		m_pairRequested=false;
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] received response for RAY_MPI_TAG_HAS_PAIRED_READ "<<rank<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 	}else if(!m_hasPairReceived){
+ 		return;
+ 	}else if(!m_hasPair){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] has no pair ! "<<rank<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		m_readAnnotationId++;
+ 		m_hasPairRequested=false;
+ 	}else if(!m_pairRequested){
+@@ -856,8 +912,24 @@ void Scaffolder::processAnnotation(){
+ 		m_virtualCommunicator->pushMessage(m_workerId,&aMessage);
+ 		m_pairRequested=true;
+ 		m_pairReceived=false;
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] sending RAY_MPI_TAG_GET_READ_MATE source: 111";
++			cout<<" destination: "<<rank<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 	}else if(!m_pairReceived
+ 	&&m_virtualCommunicator->isMessageProcessed(m_workerId)){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] received response to RAY_MPI_TAG_GET_READ_MATE source: 111";
++			cout<<" destination: "<<rank<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		vector<MessageUnit> response;
+ 		m_virtualCommunicator->getMessageResponseElements(m_workerId,&response);
+ 		m_readLength=response[0];
+@@ -867,8 +939,17 @@ void Scaffolder::processAnnotation(){
+ 		m_pairReceived=true;
+ 		m_markersRequested=false;
+ 	}else if(!m_pairReceived){
++
+ 		return;
+ 	}else if(!m_markersRequested){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] sending RAY_MPI_TAG_GET_READ_MARKERS source: 111";
++			cout<<" destination: "<<m_pairedReadRank<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		MessageUnit*buffer=(MessageUnit*)m_outboxAllocator->allocate(1*sizeof(Kmer));
+ 		buffer[0]=m_pairedReadIndex;
+ 		Message aMessage(buffer,1,
+@@ -878,6 +959,14 @@ void Scaffolder::processAnnotation(){
+ 		m_markersReceived=false;
+ 	}else if(!m_markersReceived
+ 	&&m_virtualCommunicator->isMessageProcessed(m_workerId)){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] received response for  RAY_MPI_TAG_GET_READ_MARKERS source: 111";
++			cout<<" destination: "<<m_pairedReadRank<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		vector<MessageUnit> response;
+ 		m_virtualCommunicator->getMessageResponseElements(m_workerId,&response);
+ 		int bufferPosition=0;
+@@ -909,6 +998,13 @@ void Scaffolder::processAnnotation(){
+ 
+ 		int elementsPerQuery=m_virtualCommunicator->getElementsPerQuery(RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION);
+ 
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] sending RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION source: 111";
++			cout<<" destination: "<<m_parameters->_vertexRank(&m_pairedForwardMarker)<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		Message aMessage(buffer,elementsPerQuery,
+ 			m_parameters->_vertexRank(&m_pairedForwardMarker),
+ 			RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION,m_parameters->getRank());
+@@ -917,6 +1013,14 @@ void Scaffolder::processAnnotation(){
+ 		m_forwardDirectionsReceived=false;
+ 	}else if(!m_forwardDirectionsReceived
+ 	&&m_virtualCommunicator->isMessageProcessed(m_workerId)){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] received response to RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION source: 111";
++			cout<<" destination: "<<m_parameters->_vertexRank(&m_pairedForwardMarker)<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		vector<MessageUnit> response;
+ 		m_virtualCommunicator->getMessageResponseElements(m_workerId,&response);
+ 		m_pairedForwardMarkerCoverage=response[0];
+@@ -956,6 +1060,13 @@ void Scaffolder::processAnnotation(){
+ 	}else if(!m_forwardDirectionsReceived){
+ 		return;
+ 	}else if(!m_forwardDirectionLengthRequested){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] sending RAY_MPI_TAG_GET_PATH_LENGTH source: 111"<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		MessageUnit*buffer=(MessageUnit*)m_outboxAllocator->allocate(1*sizeof(Kmer));
+ 		int rankId=getRankFromPathUniqueId(m_pairedForwardDirectionName);
+ 		buffer[0]=m_pairedForwardDirectionName;
+@@ -1126,6 +1237,13 @@ Case 13. (allowed)
+ 
+ 		int elementsPerQuery=m_virtualCommunicator->getElementsPerQuery(RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION);
+ 
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] reverse sending RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION source: 111";
++			cout<<" destination: "<<m_parameters->_vertexRank(&m_pairedForwardMarker)<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		Message aMessage(buffer,elementsPerQuery,
+ 			m_parameters->_vertexRank(&m_pairedReverseMarker),
+ 			RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION,m_parameters->getRank());
+@@ -1134,6 +1252,13 @@ Case 13. (allowed)
+ 		m_reverseDirectionsReceived=false;
+ 	}else if(!m_reverseDirectionsReceived
+ 	&&m_virtualCommunicator->isMessageProcessed(m_workerId)){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] received response to RAY_MPI_TAG_GET_COVERAGE_AND_DIRECTION source: 111"<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		vector<MessageUnit> response;
+ 		m_virtualCommunicator->getMessageResponseElements(m_workerId,&response);
+ 		m_pairedReverseMarkerCoverage=response[0];
+@@ -1172,6 +1297,13 @@ Case 13. (allowed)
+ 	}else if(!m_reverseDirectionsReceived){
+ 		return;
+ 	}else if(!m_reverseDirectionLengthRequested){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] reverse sending RAY_MPI_TAG_GET_PATH_LENGTH source: 111"<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		MessageUnit*buffer=(MessageUnit*)m_outboxAllocator->allocate(1*sizeof(Kmer));
+ 		Rank rankId=getRankFromPathUniqueId(m_pairedReverseDirectionName);
+ 		buffer[0]=m_pairedReverseDirectionName;
+@@ -1182,6 +1314,13 @@ Case 13. (allowed)
+ 		m_reverseDirectionLengthReceived=false;
+ 	}else if(!m_reverseDirectionLengthReceived
+ 	&&m_virtualCommunicator->isMessageProcessed(m_workerId)){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] reverse received response RAY_MPI_TAG_GET_PATH_LENGTH source: 111"<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		vector<MessageUnit> response;
+ 		m_virtualCommunicator->getMessageResponseElements(m_workerId,&response);
+ 		m_pairedReverseDirectionLength=response[0];
+@@ -1322,6 +1461,13 @@ Case 16. (allowed)
+ 		return;
+ 
+ 	}else if(m_reverseDirectionLengthReceived){
++
++		#ifdef __BUG_5361
++		if((*m_contigs)[m_contigId].size()==5361 && m_parameters->getRank()==111){
++			cout<<"[DEBUG] completed annotation "<<m_readAnnotationId<<endl;
++		}
++		#endif /* __BUG_5361 */
++
+ 		m_readAnnotationId++;
+ 		m_hasPairRequested=false;
+ 	}

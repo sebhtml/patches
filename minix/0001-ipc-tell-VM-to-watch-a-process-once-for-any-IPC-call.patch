@@ -1,0 +1,55 @@
+From 8408830d7554a1732cc64a01d6a73f25815364b8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Boisvert?= <sebastien.boisvert.3@ulaval.ca>
+Date: Fri, 31 Aug 2012 12:47:39 +0000
+Subject: [PATCH 1/2] ipc: tell VM to watch a process once for any IPC call
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+When the interprocess communication server receives an IPC system
+call from a process, ipc should tell VM to watch it only one. This
+patch fixes that. In the previous code, ipc was telling VM to watch
+the process for each iteration of the matching loop. In the case
+where the call type is matched in the last iteration, ipc would
+tell VM to watch the process numerous times.
+
+The patch was tested on Minix 10.0.2.15 3.2.1 i686.
+
+Signed-off-by: Sébastien Boisvert <sebastien.boisvert.3@ulaval.ca>
+---
+ servers/ipc/main.c |   17 ++++++++++-------
+ 1 files changed, 10 insertions(+), 7 deletions(-)
+
+diff --git a/servers/ipc/main.c b/servers/ipc/main.c
+index ef92bb1..1eb9d6a 100644
+--- a/servers/ipc/main.c
++++ b/servers/ipc/main.c
+@@ -64,15 +64,18 @@ int main(int argc, char *argv[])
+ 
+ 		/* dispatch messages */
+ 		for (i = 0; i < SIZE(ipc_calls); i++) {
+-			/* If any process does an IPC call,
+-			 * we have to know about it exiting.
+-			 * Tell VM to watch it for us.
+-			 */
+-			if(vm_watch_exit(m.m_source) != OK) {
+-				printf("IPC: watch failed on %d\n", m.m_source);
+-			}
+ 
+ 			if (ipc_calls[i].type == call_type) {
++
++				/* If any process does an IPC call,
++				 * we have to know about it exiting.
++				 * Tell VM to watch it for us.
++				 */
++				if(vm_watch_exit(m.m_source) != OK) {
++					printf("IPC: watch failed on %d\n", m.m_source);
++				}
++
++
+ 				int result;
+ 
+ 				result = ipc_calls[i].func(&m);
+-- 
+1.7.8.6
+

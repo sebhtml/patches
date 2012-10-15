@@ -1,0 +1,14 @@
+diff --git a/src/kurtz/libbasedir/types.h b/src/kurtz/libbasedir/types.h
+index 71b4444..de0dcf5 100644
+--- a/src/kurtz/libbasedir/types.h
++++ b/src/kurtz/libbasedir/types.h
+@@ -45,6 +45,8 @@ typedef unsigned short Ushort;        // \Typedef{Ushort}
+   code for 32 bit integers and 64 bit integers.
+ */
+ 
++#define SIXTYFOURBITS
++
+ #ifdef SIXTYFOURBITS
+ 
+ typedef unsigned long  Uint;          // \Typedef{Uint}
+
