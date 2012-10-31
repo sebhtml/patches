@@ -1,0 +1,99 @@
+From 4fa35e05e1db9de85d47202c20977567c267dd97 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?S=C3=A9bastien=20Boisvert?= <sebastien.boisvert.3@ulaval.ca>
+Date: Wed, 31 Oct 2012 18:09:35 -0400
+Subject: [PATCH] The Ray distributed genome assembled was added
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+This patch adds Ray v2.1.0 to CloudBioLinux. Ray is a
+distributed genome and metagenome assembler. Ray is built on top
+of RayPlatform and scales to very large numbers of cores. Ray is
+licensed under the GNU General Public License version 3 and is
+in C++ 1998. RayPlatform is licensed under the GNU Lesser General
+Public License version 3, is in C++ 1998, and uses the Message
+Passing Interface standard version 1.0 from the Message Passing
+Interface Forum.
+
+Signed-off-by: Sébastien Boisvert <sebastien.boisvert.3@ulaval.ca>
+---
+ cloudbio/custom/bio_nextgen.py     | 13 +++++++++++++
+ config/custom.yaml                 |  1 +
+ contrib/flavor/cloudman/tools.yaml |  3 ++-
+ manifest/custom-packages.yaml      |  5 +++++
+ 4 files changed, 21 insertions(+), 1 deletion(-)
+
+diff --git a/cloudbio/custom/bio_nextgen.py b/cloudbio/custom/bio_nextgen.py
+index a248f54..667cf1b 100644
+--- a/cloudbio/custom/bio_nextgen.py
++++ b/cloudbio/custom/bio_nextgen.py
+@@ -582,6 +582,19 @@ def install_velvet(env):
+     _get_install(url, env, _make_copy("find -perm -100 -name 'velvet*'"),
+                  post_unpack_fn=_fix_library_order)
+ 
++@_if_not_installed("Ray")
++def install_ray(env):
++    """Ray -- Parallel genome assemblies for parallel DNA sequencing 
++    http://denovoassembler.sourceforge.net/
++    """
++    default_version = "2.1.0"
++    version = env.get("tool_version", default_version)
++    url = "http://downloads.sourceforge.net/project/denovoassembler/Ray-v%s.tar.bz2" % version
++    def _ray_do_nothing(env):
++        return
++    _get_install(url, env, _make_copy("find -name Ray"),
++                 post_unpack_fn=_ray_do_nothing)
++
+ def install_trinity(env):
+     """Efficient and robust de novo reconstruction of transcriptomes from RNA-seq data.
+     http://trinityrnaseq.sourceforge.net/
+diff --git a/config/custom.yaml b/config/custom.yaml
+index 782f58f..7b8e338 100644
+--- a/config/custom.yaml
++++ b/config/custom.yaml
+@@ -40,6 +40,7 @@ bio_nextgen:
+   assembly:
+     - abyss
+     - cortex_var
++    - ray
+     - transabyss
+     - trinity
+     - velvet
+diff --git a/contrib/flavor/cloudman/tools.yaml b/contrib/flavor/cloudman/tools.yaml
+index d8888a4..4c79d5a 100644
+--- a/contrib/flavor/cloudman/tools.yaml
++++ b/contrib/flavor/cloudman/tools.yaml
+@@ -10,6 +10,7 @@ applications:
+   abyss: "1.3.3"
+   bfast: "0.7.0a"
+   velvet: "1.2.07"
++  ray: "2.1.0"
+   perm: "3.6"
+   lastz: "1.02.00"
+   mosaik: "default" # Version ignored now, CBL pulls from trunk
+@@ -111,4 +112,4 @@ bioconductor_packages:
+   - siggenes
+   - simpleaffy 
+   - snpMatrix 
+-  - vsn 
+\ No newline at end of file
++  - vsn 
+diff --git a/manifest/custom-packages.yaml b/manifest/custom-packages.yaml
+index 1a57401..bb22964 100644
+--- a/manifest/custom-packages.yaml
++++ b/manifest/custom-packages.yaml
+@@ -191,6 +191,11 @@ pydoop:
+   homepage_uri: http://pydoop.sourceforge.net/docs/
+   name: pydoop
+   version: ''
++ray: 
++  description: Ray -- Parallel genome assemblies for parallel DNA sequencing 
++  homepage_uri: http://denovoassembler.sourceforge.net/
++  name: ray
++  version: 2.1.0
+ rpy:
+   description: RPy is a very simple, yet robust, Python interface to the R Programming
+     Language.
+-- 
+1.7.11.7
+
