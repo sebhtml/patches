@@ -1,0 +1,17 @@
+--- sourceforge.net-Ray-v2.1.0/Makefile	2012-10-30 22:29:34.000000000 +0000
++++ Ray-v2.1.0/Makefile	2013-02-15 22:27:55.073131059 +0000
+@@ -186,12 +186,12 @@
+ 	
+ # how to make Ray
+ Ray: showOptions RayPlatform/libRayPlatform.a code/TheRayGenomeAssembler.a
+-	$(MPICXX) $(LDFLAGS)  code/TheRayGenomeAssembler.a RayPlatform/libRayPlatform.a -o $@
++	$(MPICXX) code/TheRayGenomeAssembler.a RayPlatform/libRayPlatform.a -o $@  $(LDFLAGS) 
+ 	@echo $(PREFIX) > PREFIX
+ 	@echo Ray > TARGETS
+ 
+ code/TheRayGenomeAssembler.a:
+-	@cd code; make MPICXX="$(MPICXX)" CXXFLAGS="$(CXXFLAGS)" -j $(J) all ; cd ..
++	@make -C code MPICXX="$(MPICXX)" CXXFLAGS="$(CXXFLAGS)" 
+ 
+ RayPlatform/libRayPlatform.a:
+ 	@cd RayPlatform; make MPICXX="$(MPICXX)" CXXFLAGS="$(CXXFLAGS)" -j $(J) ; cd ..
