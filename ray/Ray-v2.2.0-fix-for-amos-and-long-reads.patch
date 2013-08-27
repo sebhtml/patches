@@ -1,11 +1,12 @@
---- a/code/SequencesLoader/SequencesLoader.cpp	2013-04-17 09:44:55.000000000 -0400
-+++ b/code/SequencesLoader/SequencesLoader.cpp	2013-08-27 10:09:56.168561858 -0400
+diff -bur stock/Ray-v2.2.0/code/SequencesLoader/SequencesLoader.cpp Ray-v2.2.0/code/SequencesLoader/SequencesLoader.cpp
+--- stock/Ray-v2.2.0/code/SequencesLoader/SequencesLoader.cpp	2013-04-17 09:44:55.000000000 -0400
++++ Ray-v2.2.0/code/SequencesLoader/SequencesLoader.cpp	2013-08-27 10:29:30.830138632 -0400
 @@ -201,6 +201,9 @@
  	m_loader.constructor(m_parameters->getMemoryPrefix().c_str(),m_parameters->showMemoryAllocations(),
  		m_rank);
  
-+	char * seq = __Malloc(RAY_MAXIMUM_READ_LENGTH * sizeof(char));
-+	char * qlt = __Malloc(RAY_MAXIMUM_READ_LENGTH * sizeof(char));
++	char * seq = (char *) __Malloc(RAY_MAXIMUM_READ_LENGTH * sizeof(char), "CodePath/-amos", false);
++	char * qlt = (char *) __Malloc(RAY_MAXIMUM_READ_LENGTH * sizeof(char), "CodePath/-amos", false);
 +
  	for(m_distribution_file_id=0;m_distribution_file_id<(int)allFiles.size();
  		m_distribution_file_id++){
@@ -27,8 +28,8 @@
  		m_loader.reset();
  	}
 +
-+	__Free(seq);
-+	__Free(qlt);
++	__Free(qlt, "/CodePath/-amos", false);
++	__Free(seq, "/CodePath/-amos", false);
 +
  	m_loader.clear();
  	if(m_parameters->useAmos()){
