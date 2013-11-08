@@ -1,0 +1,65 @@
+diff -bur vanilla/plink-1.07-src/elf.cpp mock/plink-1.07-src/elf.cpp
+--- vanilla/plink-1.07-src/elf.cpp	2009-10-10 12:00:21.000000000 -0400
++++ mock/plink-1.07-src/elf.cpp	2013-11-08 13:57:12.000000000 -0500
+@@ -1175,10 +1175,10 @@
+ 	  << setw(8) << gcnt << " "
+ 	  << setw(8) << (double)cnt / (double)gcnt << "\n";
+ 
+-      map<int,int>::iterator i = chr_cnt.begin();
+-      while ( i != chr_cnt.end() )
++      map<int,int>::iterator mapIterator = chr_cnt.begin();
++      while ( mapIterator != chr_cnt.end() )
+ 	{
+-	  int c = i->first;
++	  int c = mapIterator->first;
+ 	  int x = chr_cnt.find( c )->second;
+ 	  int y = chr_gcnt.find( c )->second;
+ 	  
+@@ -1189,7 +1189,7 @@
+ 	      << setw(8) << y << " "
+ 	      << setw(8) << (double)x / (double)y << "\n";
+ 	  
+-	  ++i;
++	  ++mapIterator;
+ 	}
+       
+     }
+diff -bur vanilla/plink-1.07-src/idhelp.cpp mock/plink-1.07-src/idhelp.cpp
+--- vanilla/plink-1.07-src/idhelp.cpp	2009-10-10 12:00:22.000000000 -0400
++++ mock/plink-1.07-src/idhelp.cpp	2013-11-08 13:59:27.000000000 -0500
+@@ -772,12 +772,12 @@
+       for (int j = 0 ; j < jointField.size(); j++ )
+ 	{
+ 	  set<IDField*> & jf = jointField[j];
+-	  set<IDField*>::iterator j = jf.begin();
++	  set<IDField*>::iterator secondIterator = jf.begin();
+ 	  PP->printLOG(" { ");
+-	  while ( j != jf.end() )
++	  while ( secondIterator != jf.end() )
+ 	    {
+-	      PP->printLOG( (*j)->name + " " );
+-	      ++j;
++	      PP->printLOG( (*secondIterator)->name + " " );
++	      ++secondIterator;
+ 	    }
+ 	  PP->printLOG(" }");
+ 	}
+diff -bur vanilla/plink-1.07-src/sets.cpp mock/plink-1.07-src/sets.cpp
+--- vanilla/plink-1.07-src/sets.cpp	2009-10-10 12:00:20.000000000 -0400
++++ mock/plink-1.07-src/sets.cpp	2013-11-08 13:57:12.000000000 -0500
+@@ -768,11 +768,11 @@
+       //////////////////////////////////////////////
+       // Reset original missing status
+ 
+-      vector<Individual*>::iterator i = PP->sample.begin();
+-      while ( i != PP->sample.end() )
++      vector<Individual*>::iterator individualIterator = PP->sample.begin();
++      while ( individualIterator != PP->sample.end() )
+ 	{
+-	  (*i)->missing = (*i)->flag;
+-	  ++i;
++	  (*individualIterator)->missing = (*individualIterator)->flag;
++	  ++individualIterator;
+ 	}
+ 
+       ////////////////////////////////////////////////
